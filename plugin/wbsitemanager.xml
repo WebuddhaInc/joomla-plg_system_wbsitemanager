@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension version="3.1" type="plugin" group="system" method="upgrade">
+  <name>plg_system_wbsitemanager</name>
+  <description>plg_system_wbsitemanager_desc</description>
+  <author>David Hunt (webuddha.com)</author>
+  <creationDate>Dec 2015</creationDate>
+  <copyright>(c)2015 Webuddha.com, The Holodyn Corporation. All rights reserved.</copyright>
+  <license>http://www.gnu.org/copyleft/gpl.html GNU/GPL</license>
+  <authorEmail>webmaster@webuddha.com</authorEmail>
+  <authorUrl>www.webuddha.com</authorUrl>
+  <version>0.1.0</version>
+  <scriptfile>installer.php</scriptfile>
+  <updateservers>
+    <server type="extension" priority="1" name="wbSiteManager System Plugin for Joomla! CMS">https://raw.githubusercontent.com/WebuddhaInc/joomla-plg_system_wbsitemanager/master/manifest.xml</server>
+  </updateservers>
+  <files>
+    <filename plugin="wbsitemanager">wbsitemanager.php</filename>
+    <filename>wbsitemanager.xml</filename>
+    <filename>connect.php</filename>
+    <folder>language</folder>
+  </files>
+  <languages folder="language">
+    <language tag="en-GB">en-GB/en-GB.plg_system_wbsitemanager.ini</language>
+    <language tag="en-GB">en-GB/en-GB.plg_system_wbsitemanager.sys.ini</language>
+  </languages>
+  <config>
+    <fields name="params">
+      <fieldset name="basic">
+        <field
+          type="textarea"
+          name="remote_ip_filter"
+          label="plg_system_wbsitemanager_ip_filter"
+          description="plg_system_wbsitemanager_ip_filter_desc"
+          />
+        <field
+          type="textarea"
+          name="remote_user_filter"
+          label="plg_system_wbsitemanager_user_filter"
+          description="plg_system_wbsitemanager_user_filter_desc"
+          />
+      </fieldset>
+    </fields>
+  </config>
+</extension>
