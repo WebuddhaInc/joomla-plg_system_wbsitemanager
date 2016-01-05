@@ -57,9 +57,13 @@
   }
 
 // Simple IP Filter
-  if( !empty($ipFilter) && !in_array($_SERVER['REMOTE_ADDR'], $ipFilter) ){
-    header('HTTP/1.0 401 Unauthorized');
-    die('HTTP/1.0 401 Unauthorized');
+  if( !empty($ipFilter) ){
+    require_once __DIR__ . '/classes/ipv4filter.class.php';
+    $ipv4filter = new wbSiteManager_IPV4Filter($ipFilter);
+    if( !$ipv4filter->check( $_SERVER['REMOTE_ADDR'] ) ){
+      header('HTTP/1.0 401 Unauthorized ' . $_SERVER['REMOTE_ADDR']);
+      die('HTTP/1.0 401 Unauthorized ' . $_SERVER['REMOTE_ADDR']);
+    }
   }
 
 // User Auth Filter

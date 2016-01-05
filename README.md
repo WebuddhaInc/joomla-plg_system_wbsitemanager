@@ -19,6 +19,12 @@ download and install update packages.
 
     php /cli/autoupdate.php --help
 
+## CLI Usage
+
+    Joomla! CLI Autoupdate by Webuddha
+    This script can be used to examine the extension of a local Joomla!
+    installation, fetch available updates, download and install update packages.
+
     Operations
       -f, --fetch                 Run Fetch
       -u, --update                Run Update
