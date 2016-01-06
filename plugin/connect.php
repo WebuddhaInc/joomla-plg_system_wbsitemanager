@@ -32,7 +32,19 @@
 
   // Load Application & Required Libraries
     require_once JPATH_BASE . '/includes/framework.php';
+
+  // Iniitialize Application
+    if( version_compare( JVERSION, '3.2.0', '>=' ) ){
     JFactory::getApplication('cms');
+    }
+    else if( version_compare( JVERSION, '3.1.0', '>=' ) ){
+      JFactory::getApplication('site');
+    }
+    else {
+      JFactory::getApplication('administrator');
+    }
+
+  // Required Libraries
     jimport('joomla.user.authentication');
 
 // Import Configuration

@@ -8,7 +8,7 @@
   <license>http://www.gnu.org/copyleft/gpl.html GNU/GPL</license>
   <authorEmail>webmaster@webuddha.com</authorEmail>
   <authorUrl>www.webuddha.com</authorUrl>
-  <version>0.3.0</version>
+  <version>0.3.1</version>
   <scriptfile>installer.php</scriptfile>
   <updateservers>
     <server type="extension" priority="1" name="wbSiteManager System Plugin for Joomla! CMS">https://raw.githubusercontent.com/WebuddhaInc/joomla-plg_system_wbsitemanager/master/manifest.xml</server>
