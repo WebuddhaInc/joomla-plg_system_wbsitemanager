@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <updates>
+
   <update>
     <name>wbSiteManager Plugin Extension</name>
     <description>wbSiteManager Plugin Extension for Joomla! CMS</description>
@@ -14,4 +15,20 @@
     </downloads>
     <targetplatform name="joomla" version="2.5" />
   </update>
+
+  <update>
+    <name>wbSiteManager Plugin Extension</name>
+    <description>wbSiteManager Plugin Extension for Joomla! CMS</description>
+    <element>wbsitemanager</element>
+    <type>plugin</type>
+    <folder>system</folder>
+    <version>0.3.1</version>
+    <client>0</client>
+    <infourl title="wbSiteManager Plugin Extension">https://github.com/WebuddhaInc/joomla-plg_system_wbsitemanager</infourl>
+    <downloads>
+      <downloadurl type="full" format="zip">https://raw.githubusercontent.com/WebuddhaInc/joomla-plg_system_wbsitemanager/master/plg_system_wbsitemanager.package.zip</downloadurl>
+    </downloads>
+    <targetplatform name="joomla" version="3.4" />
+  </update>
+
 </updates>
