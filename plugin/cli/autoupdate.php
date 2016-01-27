@@ -502,8 +502,10 @@
      */
     public function startOutputBuffer(){
       $this->__outputBuffer = array(
-        'log'    => array(),
-        'data'   => array()
+        'status'  => 200,
+        'message' => 'Success',
+        'log'     => array(),
+        'data'    => array()
         );
     }
 

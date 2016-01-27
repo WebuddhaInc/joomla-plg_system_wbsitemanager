@@ -35,7 +35,7 @@
 
   // Iniitialize Application
     if( version_compare( JVERSION, '3.2.0', '>=' ) ){
-    JFactory::getApplication('cms');
+      JFactory::getApplication('cms');
     }
     else if( version_compare( JVERSION, '3.1.0', '>=' ) ){
       JFactory::getApplication('site');
@@ -58,8 +58,8 @@
       die('HTTP/1.0 503 Service Unavailable');
     }
     $plugin_params = json_decode($plugin->params);
-    $ipFilter = array_filter(explode("\n", $plugin_params->remote_ip_filter), 'strlen');
-    $userFilter = array_filter(explode("\n", $plugin_params->remote_user_filter), 'strlen');
+    $ipFilter = array_filter(explode("\n", preg_replace('/[^\n0-9\.\*]/','',$plugin_params->remote_ip_filter)), 'strlen');
+    $userFilter = array_filter(explode("\n", preg_replace('/[^\na-z0-9\.\@\_\-]/','',strtolower($plugin_params->remote_user_filter))), 'strlen');
   }
 
 // Filter Required
@@ -81,9 +81,15 @@
 // User Auth Filter
   if( !empty($userFilter) ){
     $headers = getallheaders();
+    $authCredentials = null;
     if( !empty($headers['Authorization']) ){
       $headerAuth = explode(' ', $headers['Authorization'], 2);
       $authCredentials = array_combine(array('username', 'password'), explode(':', base64_decode(end($headerAuth)), 2));
+    }
+    else if( @$_SERVER['PHP_AUTH_USER'] && @$_SERVER['PHP_AUTH_PW'] ){
+      $authCredentials = array('username' => $_SERVER['PHP_AUTH_USER'], 'password' => $_SERVER['PHP_AUTH_PW']);
+    }
+    if( $authCredentials ){
       if( is_array($userFilter) && !in_array($authCredentials['username'], $userFilter) ){
         header('HTTP/1.0 401 Unauthorized');
         die('HTTP/1.0 401 Unauthorized');
