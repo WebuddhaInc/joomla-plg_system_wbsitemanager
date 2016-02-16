@@ -1,0 +1,7 @@
+
+#
+# Instruct FastCGI to pass HTTP_AUTH
+#
+
+# RewriteCond %{HTTP:Authorization} ^(.+)
+# RewriteRule ^(.*)$ $1 [E=HTTP_AUTHORIZATION:%1,PT]

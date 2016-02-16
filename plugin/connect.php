@@ -114,7 +114,7 @@
   foreach( $mQuery AS $k => $v ){
     $_SERVER['argv'][] = '-' . $k;
     if( strlen($v) )
-      $_SERVER['argv'][] = $v;
+      $_SERVER['argv'][] = urldecode($v);
   }
 
 // Include / Execute CLI Class
