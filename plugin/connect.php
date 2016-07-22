@@ -118,4 +118,8 @@
   }
 
 // Include / Execute CLI Class
+  if (!is_readable(JPATH_BASE . '/cli/autoupdate.php')) {
+    header('HTTP/1.0 404 Update CLI not found');
+    die('HTTP/1.0 404 Update CLI not found');
+  }
   include JPATH_BASE . '/cli/autoupdate.php';
