@@ -1,4 +1,6 @@
-# wbSiteManager System Plugin for Joomla! CMS
+# Joomla Remote Installer & Extension API
+
+## wbSiteManager System Plugin for Joomla! CMS
 
 The Webuddha Site Manager is provides Command Line and Remote management of
 the Core, Component, Module, and Plugin extensions in a Joomla! installation.
