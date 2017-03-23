@@ -82,7 +82,11 @@
   if( !empty($userFilter) ){
     $headers = getallheaders();
     $authCredentials = null;
-    if( !empty($headers['Authorization']) ){
+    if( !empty($headers['Authorization-Manager']) ){
+      $headerAuth = explode(' ', $headers['Authorization-Manager'], 2);
+      $authCredentials = array_combine(array('username', 'password'), explode(':', base64_decode(end($headerAuth)), 2));
+    }
+    else if( !empty($headers['Authorization']) ){
       $headerAuth = explode(' ', $headers['Authorization'], 2);
       $authCredentials = array_combine(array('username', 'password'), explode(':', base64_decode(end($headerAuth)), 2));
     }
