@@ -14,6 +14,7 @@ class wbSiteManager_StandaloneInstaller {
    * ************************************************************************************************************************/
   private $config = array(
     'cache_path'  => null,
+    'source_path' => null,
     'source_file' => null,
     'target_path' => null
     );
@@ -60,6 +61,7 @@ class wbSiteManager_StandaloneInstaller {
     // Initialize
       $time           = time();
       $cache_path     = $this->config['cache_path'];
+      $source_path    = $this->config['source_path'];
       $source_file    = $this->config['source_file'];
       $target_path    = $this->config['target_path'];
       $install_tmp    = $cache_path . '/installer_' . $time . '/';
@@ -67,25 +69,31 @@ class wbSiteManager_StandaloneInstaller {
       $install_target = $target_path . '/';
 
     // Required
-      if (!is_file($source_file))
-        $this->log('Invalid `source_file`', true);
+      if (!is_dir($source_path) && !is_file($source_file))
+        $this->log('Invalid `source_path` or `source_file`', true);
       if (!is_dir($cache_path))
         $this->log('Invalid `cache_path`', true);
       if (!is_dir($target_path))
         $this->log('Invalid `target_path`', true);
 
     // Unpack File
-      $this->log('Extracting Package');
-      $unzipResult = $this->unzip_package( $source_file, $install_tmp );
-      if (empty($unzipResult)) {
-        $this->unlink( $install_tmp );
-        $this->log('Extract Failed', true);
+      if ($source_file) {
+        $this->log('Extracting Package');
+        $unzipResult = $this->unzip_package( $source_file, $install_tmp );
+        if (empty($unzipResult)) {
+          $this->unlink( $install_tmp );
+          $this->log('Extract Failed', true);
+        }
+        $source_path = $install_tmp;
+      }
+      else {
+        $source_path .= substr($source_path, -1, 1) == DIRECTORY_SEPARATOR ? '' : DIRECTORY_SEPARATOR;
       }
 
     // Compare Results
       $this->log('Comparing Package');
       $compareResult = $this->compare(
-        $install_tmp,
+        $source_path,
         $install_target,
         array(
           'translate' => array(
@@ -244,6 +252,9 @@ class wbSiteManager_StandaloneInstaller {
   function unlink($path, $empty = false) {
     if( substr($path,-1) == DIRECTORY_SEPARATOR )
       $path = substr($path,0,-1);
+    if( !is_dir($path) ){
+      return false;
+    }
     if( !is_readable($path) ){
       $this->log("Path is NOT Readable $path");
       return false;

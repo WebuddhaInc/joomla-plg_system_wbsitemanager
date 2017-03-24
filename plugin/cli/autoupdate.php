@@ -271,18 +271,21 @@
           else if( $parse_url = parse_url( $build_url ) ){
             $this->out('Processing Update from '. $parse_url['host']);
           }
+          if( $build_url ){
+            $update = new JUpdate();
+            if( $this->installer && defined('JUpdater::STABILITY_STABLE') ){
+              $update->loadFromXml($build_url, $this->installer->params->get('minimum_stability', JUpdater::STABILITY_STABLE, 'int'));
+            }
+            else {
+              $update->loadFromXml($build_url);
+            }
+            if( !empty($updateRow->extra_query) ){
+              $update->set('extra_query', $updateRow->extra_query);
+            }
+          }
         }
-        if( $build_url ){
-          $update = new JUpdate();
-          if( $this->installer && defined('JUpdater::STABILITY_STABLE') ){
-            $update->loadFromXml($build_url, $this->installer->params->get('minimum_stability', JUpdater::STABILITY_STABLE, 'int'));
-          }
-          else {
-            $update->loadFromXml($build_url);
-          }
-          if( !empty($updateRow->extra_query) ){
-            $update->set('extra_query', $updateRow->extra_query);
-          }
+        else if ($package_url) {
+          $this->out('Processing Update from URL');
         }
 
       // Pull Packge URL from Build
@@ -300,7 +303,11 @@
           $tmpPath = JPATH_BASE . '/tmp';
         }
         $this->out(' - Download ' . $package_url);
-        $p_file = JInstallerHelper::downloadPackage($package_url);
+        $t_file = JInstallerHelper::getFilenameFromUrl($package_url);
+        if (!preg_match('/\.zip$/', $t_file)) {
+          $t_file .= '.zip';
+        }
+        $p_file = JInstallerHelper::downloadPackage($package_url, $t_file);
         if( $p_file && is_file($tmpPath . '/' . $p_file) ){
           $filePath = $tmpPath . '/' . $p_file;
         }
@@ -340,11 +347,27 @@
           return false;
         }
 
+      // Extracting Package
+        $this->out(' - Extracting Package');
+        $package = JInstallerHelper::unpack($filePath, true);
+        if( empty($package) || empty($package['extractdir']) ){
+          $this->out(' - Extract Failed');
+          $this->outStatus(400, 'Extract Failed');
+          JFile::delete($filePath);
+          return false;
+        }
+        JFile::delete($filePath);
+
+      // No Type? Check if Core
+        if (!$package['type'] && is_file($package['extractdir'] . '/administrator/manifests/files/joomla.xml')) {
+          $package['type'] = 'file';
+        }
+
       // Success Flag
         $success = true;
 
       // File Installations
-        if ($updateRow->type == 'file') {
+        if ($package['type'] == 'file') {
 
           // Build Standalone
             $installer_file = $tmpPath . '/installer_' . time() . '.php';
@@ -360,7 +383,7 @@
                 'include("'. JPATH_BASE .'/plugins/system/wbsitemanager/standaloneInstaller.php");',
                 '$installer = new wbSiteManager_StandaloneInstaller(array(',
                 '  "cache_path"  => "'. $tmpPath .'",',
-                '  "source_file" => "'. $filePath .'",',
+                '  "source_path" => "'. $package['extractdir'] .'",',
                 '  "target_path" => "'. JPATH_BASE . '"',
                 '  ));',
                 '$installer->execute();'
@@ -371,7 +394,6 @@
             else {
               $this->out(' - Error: Failed to generate standalone installer');
               $this->outStatus(400, 'Failed to generate standalone installer');
-              JInstallerHelper::cleanupInstall($filePath);
               return false;
             }
 
@@ -384,7 +406,7 @@
                 if (preg_match('/Error: (.*)/', $line, $match)) {
                   $this->out('-  Error: ' . $match[1]);
                   $this->outStatus(400, $match[1]);
-                  JInstallerHelper::cleanupInstall($installer_file);
+                  JFile::delete($installer_file);
                   return false;
                 }
               }
@@ -392,13 +414,22 @@
             else {
               $this->out('- Error: No Response');
               $this->outStatus(400, 'No Response');
-              JInstallerHelper::cleanupInstall($installer_file);
+              JFile::delete($installer_file);
               return false;
             }
 
           // Cleanup Installer
             $this->out('- File Upgrade Complete');
-            JInstallerHelper::cleanupInstall($installer_file);
+            JFile::delete($installer_file);
+
+          // Delete Installation
+            if (is_dir(JPATH_BASE . '/installation')) {
+              $this->out('Deleting Installation Folder');
+              JFolder::delete(JPATH_BASE . '/installation');
+            }
+
+          // Purge Updates
+            $this->doPurgeUpdatesCache();
 
           // Process Database Updates
             $this->out('Processing Manifest Updates');
@@ -412,24 +443,16 @@
             }
             $this->out('- Manifest Updates Complete');
 
-          // Purge and Refresh Updates
-            $this->doPurgeUpdatesCache();
+          // Fetch Updates
             $this->doFetchUpdates();
 
         }
 
       // Package Installations
-        else {
+        else if($package['type']) {
 
-          // Extracting Package
-            $this->out(' - Extracting Package');
-            $package = JInstallerHelper::unpack($filePath);
-            if( !$package ){
-              $this->out(' - Extract Failed');
-              $this->outStatus(400, 'Extract Failed');
-              JInstallerHelper::cleanupInstall($filePath);
-              return false;
-            }
+          // Log Selection
+            $this->out('Processing ' . $package['type']);
 
           // Install the package
             $this->out(' - Installing ' . $package['dir']);
@@ -446,6 +469,17 @@
             JInstallerHelper::cleanupInstall($package['packagefile'], $package['extractdir']);
 
         }
+
+      // No Type
+        else {
+
+          $this->out('Invalid Package');
+          $this->outStatus(400, 'Invalid Package');
+          JInstallerHelper::cleanupInstall($package['packagefile'], $package['extractdir']);
+          return false;
+
+        }
+
 
       // Complete
         return $success ?: false;
