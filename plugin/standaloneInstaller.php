@@ -109,19 +109,18 @@ class wbSiteManager_StandaloneInstaller {
         $install_target,
         $compareResult,
         array(
-          'backup_path' => $backup_tmp
+          'backup_path' => $backup_path
           )
         );
       if (!$upgradeResult) {
         $this->unlink( $install_tmp );
-        $this->unlink( $backup_tmp );
+        $this->unlink( $backup_path );
         $this->log('Upgrade Failed', true);
       }
 
     // Cleanup
       $this->log('Cleanup');
       $this->unlink( $install_tmp );
-      $this->unlink( $backup_tmp );
 
     // Complete
       $this->log('Done!');

@@ -396,9 +396,18 @@
               return false;
             }
 
-          // Cleanup Standalone
-            $this->out(' - Update Success');
+          // Cleanup Installer
+            $this->out('- File Upgrade Complete');
             JInstallerHelper::cleanupInstall($installer_file);
+
+          // Process Database Updates
+            require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
+            $model = new JoomlaupdateModelDefault();
+            if (!$model->finaliseUpgrade()) {
+              $this->out('- Error: Manifest ' . JInstaller::getInstance()->getError());
+              $this->outStatus(400, 'Manifest ' . JInstaller::getInstance()->getError());
+              return false;
+            }
 
         }
 
