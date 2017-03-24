@@ -161,7 +161,7 @@
      */
     public function throwError( $error ){
       $this->out('Error #' . $error->getCode() .' - ' . JText::_($error->getMessage()));
-      die();
+      exit(1);
     }
 
     /**
@@ -261,10 +261,10 @@
     public function doInstallUpdate( $update_id, $build_url = null, $package_url = null ){
 
       // Load Build XML
+        $updateRow = JTable::getInstance('update');
         if( $update_id || $build_url ){
           if( $update_id ){
             $this->out('Processing Update #'. $update_id);
-            $updateRow = JTable::getInstance('update');
             $updateRow->load( $update_id );
             $build_url = $updateRow->detailsurl;
           }
@@ -296,75 +296,146 @@
 
       // Download
         $tmpPath = $this->config->get('tmp_path');
-        if( !is_writeable($tmpPath) ){
-          $tmpPath = JPATH_BASE . '/tmp';
-        }
-        $this->out(' - Download ' . $package_url);
-        $p_file = JInstallerHelper::downloadPackage($package_url);
-        if( $p_file && is_file($tmpPath . '/' . $p_file) ){
-          $filePath = $tmpPath . '/' . $p_file;
-        }
-        else {
-          $this->out(' - Download Failed, Attempting alternate download method');
-          $urlFile = preg_replace('/^.*\/(.*?)$/', '$1', $package_url);
-          $filePath = $tmpPath . '/' . $urlFile;
-          if( $fileHandle = @fopen($filePath, 'w+') ){
-            $curl = curl_init($package_url);
-            curl_setopt_array($curl, [
-              CURLOPT_URL            => $package_url,
-              CURLOPT_FOLLOWLOCATION => 1,
-              CURLOPT_BINARYTRANSFER => 1,
-              CURLOPT_RETURNTRANSFER => 1,
-              CURLOPT_FILE           => $fileHandle,
-              CURLOPT_TIMEOUT        => 50,
-              CURLOPT_USERAGENT      => 'Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)'
-            ]);
-            $response = curl_exec($curl);
-            if( $response === false ){
-              $this->out(' - Download Failed: ' . curl_error($curl));
-              return false;
-            }
+        $filePath = '/home/joomdemo/public_html/tmp/Joomla_3.6.5-Stable-Update_Package.zip';
+        if (!is_file($filePath)){
+          if( !is_writeable($tmpPath) ){
+            $tmpPath = JPATH_BASE . '/tmp';
+          }
+          $this->out(' - Download ' . $package_url);
+          $p_file = JInstallerHelper::downloadPackage($package_url);
+          if( $p_file && is_file($tmpPath . '/' . $p_file) ){
+            $filePath = $tmpPath . '/' . $p_file;
           }
           else {
-            $this->out(' - Download Failed, Error writing ' . $filePath);
-            return false;
+            $this->out(' - Download Failed, Attempting alternate download method');
+            $urlFile = preg_replace('/^.*\/(.*?)$/', '$1', $package_url);
+            $filePath = $tmpPath . '/' . $urlFile;
+            if( $fileHandle = @fopen($filePath, 'w+') ){
+              $curl = curl_init($package_url);
+              curl_setopt_array($curl, [
+                CURLOPT_URL            => $package_url,
+                CURLOPT_FOLLOWLOCATION => 1,
+                CURLOPT_BINARYTRANSFER => 1,
+                CURLOPT_RETURNTRANSFER => 1,
+                CURLOPT_FILE           => $fileHandle,
+                CURLOPT_TIMEOUT        => 50,
+                CURLOPT_USERAGENT      => 'Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)'
+              ]);
+              $response = curl_exec($curl);
+              if( $response === false ){
+                $this->out(' - Download Failed: ' . curl_error($curl));
+                $this->outStatus(400, 'Download Failed: ' . curl_error($curl));
+                return false;
+              }
+            }
+            else {
+              $this->out(' - Download Failed, Error writing ' . $filePath);
+              $this->outStatus(400, 'Download Failed, Error writing ' . $filePath);
+              return false;
+            }
           }
         }
 
       // Catch Error
         if( !is_file($filePath) ){
           $this->out(' - Download Failed / File not found');
+          $this->outStatus(400, 'Download Failed / File not found');
           return false;
         }
 
-      // Extracting Package
-        $this->out(' - Extracting Package');
-        $package = JInstallerHelper::unpack($filePath);
-        if( !$package ){
-          $this->out(' - Extract Failed');
-          JInstallerHelper::cleanupInstall($filePath);
-          return false;
+      // Success Flag
+        $success = true;
+
+      // File Installations
+        if ($updateRow->type == 'file') {
+
+          // Build Standalone
+            $installer_file = $tmpPath . '/installer_' . time() . '.php';
+            $installer_script = JPATH_BASE . '/plugins/system/wbsitemanager/standaloneInstaller.php';
+            if ($fh = fopen($installer_file, 'w')) {
+              $installer_code = array(
+                '<?php',
+                '/**',
+                ' * wbSiteManager Installer ' . date('Y-m-d H:i:s'),
+                ' */',
+                '',
+                '$time = time();',
+                'include("'. JPATH_BASE .'/plugins/system/wbsitemanager/standaloneInstaller.php");',
+                '$installer = new wbSiteManager_StandaloneInstaller(array(',
+                '  "cache_path"  => "'. $tmpPath .'",',
+                '  "source_file" => "'. $filePath .'",',
+                '  "target_path" => "'. JPATH_BASE . '"',
+                '  ));',
+                '$installer->execute();'
+                );
+              fwrite( $fh, implode("\n", $installer_code) );
+              fclose( $fh );
+            }
+            else {
+              $this->out(' - Error: Failed to generate standalone installer');
+              $this->outStatus(400, 'Failed to generate standalone installer');
+              JInstallerHelper::cleanupInstall($filePath);
+              return false;
+            }
+
+          // Call Standalone
+            $this->out('Calling Standalone Installer');
+            $exec_output = shell_exec('php ' . $installer_file);
+            if ($exec_output) {
+              foreach (array_filter(explode("\n", $exec_output), 'strlen') AS $line) {
+                $this->out(' - ' . $line);
+                if (preg_match('/Error: (.*)/', $line, $match)) {
+                  $this->out('-  Error: ' . $match[1]);
+                  $this->outStatus(400, $match[1]);
+                  JInstallerHelper::cleanupInstall($installer_file);
+                  return false;
+                }
+              }
+            }
+            else {
+              $this->out('- Error: No Response');
+              $this->outStatus(400, 'No Response');
+              JInstallerHelper::cleanupInstall($installer_file);
+              return false;
+            }
+
+          // Cleanup Standalone
+            $this->out(' - Update Success');
+            JInstallerHelper::cleanupInstall($installer_file);
+
         }
 
-      // Install the package
-        $this->out(' - Installing ' . $package['dir']);
-        $installer = JInstaller::getInstance();
-        // $update->set('type', $package['type']);
-        if( !$installer->update($package['dir']) ){
-          $this->out(' - Update Error');
-          $result = false;
-        }
+      // Package Installations
         else {
-          $this->out(' - Update Success');
-          $result = true;
-        }
 
-      // Cleanup the install files
-        $this->out(' - Cleanup');
-        JInstallerHelper::cleanupInstall($package['packagefile'], $package['extractdir']);
+          // Extracting Package
+            $this->out(' - Extracting Package');
+            $package = JInstallerHelper::unpack($filePath);
+            if( !$package ){
+              $this->out(' - Extract Failed');
+              $this->outStatus(400, 'Extract Failed');
+              JInstallerHelper::cleanupInstall($filePath);
+              return false;
+            }
+
+          // Install the package
+            $this->out(' - Installing ' . $package['dir']);
+            $installer = JInstaller::getInstance();
+            if( !$installer->update($package['dir']) ){
+              $this->out(' - Error Installing Update');
+              $this->outStatus(400, 'Error Installing Update');
+              JInstallerHelper::cleanupInstall($package['packagefile'], $package['extractdir']);
+              return false;
+            }
+
+          // Success
+            $this->out(' - Update Success');
+            JInstallerHelper::cleanupInstall($package['packagefile'], $package['extractdir']);
+
+        }
 
       // Complete
-        return $result;
+        return $success ?: false;
 
     }
 
@@ -534,6 +605,17 @@
         return $this;
       }
       return parent::out( $text, $nl );
+    }
+
+    /**
+     * [outStatus description]
+     * @param  [type] $status  [description]
+     * @param  [type] $message [description]
+     * @return [type]          [description]
+     */
+    public function outStatus( $status, $message ){
+      $this->__outputBuffer['status']  = $status;
+      $this->__outputBuffer['message'] = $message;
     }
 
     /**
