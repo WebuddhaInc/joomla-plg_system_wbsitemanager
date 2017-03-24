@@ -412,6 +412,10 @@
             }
             $this->out('- Manifest Updates Complete');
 
+          // Purge and Refresh Updates
+            $this->doPurgeUpdatesCache();
+            $this->doFetchUpdates();
+
         }
 
       // Package Installations
