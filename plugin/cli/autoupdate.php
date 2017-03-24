@@ -401,13 +401,16 @@
             JInstallerHelper::cleanupInstall($installer_file);
 
           // Process Database Updates
+            $this->out('Processing Manifest Updates');
             require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
             $model = new JoomlaupdateModelDefault();
             if (!$model->finaliseUpgrade()) {
-              $this->out('- Error: Manifest ' . JInstaller::getInstance()->getError());
-              $this->outStatus(400, 'Manifest ' . JInstaller::getInstance()->getError());
+              $error_msg = JInstaller::getInstance()->getError();
+              $this->out('- Error: Manifest ' . $error_msg);
+              $this->outStatus(400, 'Manifest ' . $error_msg);
               return false;
             }
+            $this->out('- Manifest Updates Complete');
 
         }
 
