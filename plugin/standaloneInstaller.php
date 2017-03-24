@@ -103,11 +103,6 @@ class wbSiteManager_StandaloneInstaller {
       }
       $this->log('Prepared to Create '. count($compareResult['create']) .', Update '. count($compareResult['update']) .' file(s)');
 
-// Test Failure
-$this->unlink( $install_tmp );
-$this->log('Upgrade Failed', true);
-return false;
-
     // Install Package
       $this->log('Upgrading Package');
       $upgradeResult = $this->upgrade(

@@ -296,43 +296,40 @@
 
       // Download
         $tmpPath = $this->config->get('tmp_path');
-        $filePath = '/home/joomdemo/public_html/tmp/Joomla_3.6.5-Stable-Update_Package.zip';
-        if (!is_file($filePath)){
-          if( !is_writeable($tmpPath) ){
-            $tmpPath = JPATH_BASE . '/tmp';
-          }
-          $this->out(' - Download ' . $package_url);
-          $p_file = JInstallerHelper::downloadPackage($package_url);
-          if( $p_file && is_file($tmpPath . '/' . $p_file) ){
-            $filePath = $tmpPath . '/' . $p_file;
-          }
-          else {
-            $this->out(' - Download Failed, Attempting alternate download method');
-            $urlFile = preg_replace('/^.*\/(.*?)$/', '$1', $package_url);
-            $filePath = $tmpPath . '/' . $urlFile;
-            if( $fileHandle = @fopen($filePath, 'w+') ){
-              $curl = curl_init($package_url);
-              curl_setopt_array($curl, [
-                CURLOPT_URL            => $package_url,
-                CURLOPT_FOLLOWLOCATION => 1,
-                CURLOPT_BINARYTRANSFER => 1,
-                CURLOPT_RETURNTRANSFER => 1,
-                CURLOPT_FILE           => $fileHandle,
-                CURLOPT_TIMEOUT        => 50,
-                CURLOPT_USERAGENT      => 'Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)'
-              ]);
-              $response = curl_exec($curl);
-              if( $response === false ){
-                $this->out(' - Download Failed: ' . curl_error($curl));
-                $this->outStatus(400, 'Download Failed: ' . curl_error($curl));
-                return false;
-              }
-            }
-            else {
-              $this->out(' - Download Failed, Error writing ' . $filePath);
-              $this->outStatus(400, 'Download Failed, Error writing ' . $filePath);
+        if( !is_writeable($tmpPath) ){
+          $tmpPath = JPATH_BASE . '/tmp';
+        }
+        $this->out(' - Download ' . $package_url);
+        $p_file = JInstallerHelper::downloadPackage($package_url);
+        if( $p_file && is_file($tmpPath . '/' . $p_file) ){
+          $filePath = $tmpPath . '/' . $p_file;
+        }
+        else {
+          $this->out(' - Download Failed, Attempting alternate download method');
+          $urlFile = preg_replace('/^.*\/(.*?)$/', '$1', $package_url);
+          $filePath = $tmpPath . '/' . $urlFile;
+          if( $fileHandle = @fopen($filePath, 'w+') ){
+            $curl = curl_init($package_url);
+            curl_setopt_array($curl, [
+              CURLOPT_URL            => $package_url,
+              CURLOPT_FOLLOWLOCATION => 1,
+              CURLOPT_BINARYTRANSFER => 1,
+              CURLOPT_RETURNTRANSFER => 1,
+              CURLOPT_FILE           => $fileHandle,
+              CURLOPT_TIMEOUT        => 50,
+              CURLOPT_USERAGENT      => 'Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)'
+            ]);
+            $response = curl_exec($curl);
+            if( $response === false ){
+              $this->out(' - Download Failed: ' . curl_error($curl));
+              $this->outStatus(400, 'Download Failed: ' . curl_error($curl));
               return false;
             }
+          }
+          else {
+            $this->out(' - Download Failed, Error writing ' . $filePath);
+            $this->outStatus(400, 'Download Failed, Error writing ' . $filePath);
+            return false;
           }
         }
 
