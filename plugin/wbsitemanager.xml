@@ -17,8 +17,8 @@
     <filename plugin="wbsitemanager">wbsitemanager.php</filename>
     <filename>connect.php</filename>
     <filename>htaccess.txt</filename>
-    <filename>installer.xml</filename>
-    <filename>standaloneInstaller.xml</filename>
+    <filename>wbsitemanager.php</filename>
+    <filename>standaloneInstaller.php</filename>
     <filename>wbsitemanager.xml</filename>
     <folder>classes</folder>
     <folder>language</folder>
