@@ -30,9 +30,14 @@
     define('_JEXEC', 1);
   }
 
-// Define ase
+// Define Base
   if( !defined('JPATH_BASE') ){
     define('JPATH_BASE', dirname(getcwd()));
+  }
+
+// Define CLI
+  if( !defined('CLI') && function_exists('php_sapi_name') && substr(php_sapi_name(), 0, 3) == 'cli' ){
+    define('CLI', 1);
   }
 
 // Load system defines
@@ -133,6 +138,12 @@
         $config = JFactory::getConfig();
         $config->set('tmp_path', $this->config->get('tmp_path'));
         $config->set('log_path', $this->config->get('log_path'));
+
+      // Site Root
+        if (!defined('CLI')) {
+          $config->set('site_base', str_replace('plugins/system/wbsitemanager/', '', JUri::base()));
+          $this->config->set('site_base', $config->get('site_base'));
+        }
 
     }
 
@@ -370,9 +381,10 @@
         if ($package['type'] == 'file') {
 
           // Build Standalone
-            $installer_file = $tmpPath . '/installer_' . time() . '.php';
-            $installer_script = JPATH_BASE . '/plugins/system/wbsitemanager/standaloneInstaller.php';
-            if ($fh = fopen($installer_file, 'w')) {
+            $installer_filename = 'installer_' . time() . '.php';
+            $installer_filepath = $tmpPath . '/' . $installer_filename;
+            $installer_script   = JPATH_BASE . '/plugins/system/wbsitemanager/standaloneInstaller.php';
+            if ($fh = fopen($installer_filepath, 'w')) {
               $installer_code = array(
                 '<?php',
                 '/**',
@@ -397,30 +409,73 @@
               return false;
             }
 
-          // Call Standalone
+          // Call standalone
+          // CLI users will get a local run
+          // Remote users will get a local callback
             $this->out('Calling Standalone Installer');
-            $exec_output = shell_exec('php ' . $installer_file);
-            if ($exec_output) {
-              foreach (array_filter(explode("\n", $exec_output), 'strlen') AS $line) {
-                $this->out(' - ' . $line);
-                if (preg_match('/Error: (.*)/', $line, $match)) {
-                  $this->out('-  Error: ' . $match[1]);
-                  $this->outStatus(400, $match[1]);
-                  JFile::delete($installer_file);
-                  return false;
+            if (defined('CLI')) {
+              $exec_output = shell_exec('php ' . $installer_file);
+              if ($exec_output) {
+                foreach (array_filter(explode("\n", $exec_output), 'strlen') AS $line) {
+                  $this->out(' - ' . $line);
+                  if (preg_match('/Error: (.*)/', $line, $match)) {
+                    $this->out('-  Error: ' . $match[1]);
+                    $this->outStatus(400, $match[1]);
+                    JFile::delete($installer_filepath);
+                    return false;
+                  }
                 }
+              }
+              else {
+                $this->out('- Error: No Response from Standalone Installer');
+                $this->outStatus(400, 'No Response from Standalone Installer');
+                JFile::delete($installer_filepath);
+                return false;
               }
             }
             else {
-              $this->out('- Error: No Response');
-              $this->outStatus(400, 'No Response');
-              JFile::delete($installer_file);
-              return false;
+              $installer_url = $this->config->get('site_base') . 'tmp/' . $installer_filename;
+              $ch = curl_init();
+              curl_setopt_array($ch, [
+                CURLOPT_URL => $installer_url,
+                CURLOPT_RETURNTRANSFER => 1,
+                CURLOPT_FOLLOWLOCATION => 1,
+                CURLOPT_TIMEOUT => 90,
+                CURLOPT_VERBOSE => 1,
+                CURLOPT_HEADER => 1,
+                CURLOPT_HTTPHEADER => array(
+                  'User-Agent: wbSiteManager/0.0.0 curl/'. curl_version() .' PHP/' . phpversion()
+                  ),
+                CURLINFO_HEADER_OUT => 1,
+              ]);
+              $res         = curl_exec($ch);
+              $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+              $header      = substr($res, 0, $header_size);
+              $resContent = substr($res, $header_size);
+              $resSuccess = curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200;
+              $resMessage = reset(explode("\r\n", $header));
+
+              if ($resSuccess) {
+                foreach (array_filter(explode("\n", $resContent), 'strlen') AS $line) {
+                  $this->out(' - ' . $line);
+                  if (preg_match('/Error: (.*)/', $line, $match)) {
+                    $this->outStatus(400, $match[1]);
+                    JFile::delete($installer_filepath);
+                    return false;
+                  }
+                }
+              }
+              else {
+                $this->out('- Error: No Response from Standalone Installer');
+                $this->outStatus(400, 'No Response from Standalone Installer');
+                JFile::delete($installer_filepath);
+                return false;
+              }
             }
 
           // Cleanup Installer
             $this->out('- File Upgrade Complete');
-            JFile::delete($installer_file);
+            JFile::delete($installer_filepath);
 
           // Delete Installation
             if (is_dir(JPATH_BASE . '/installation')) {
