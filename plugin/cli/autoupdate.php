@@ -382,6 +382,8 @@
 
           // Preload in case files change
             require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
+            $app = JInstaller::getInstance();
+            $model = new JoomlaupdateModelDefault();
 
           // Build Standalone
             $installer_filename = 'installer_' . time() . '.php';
@@ -457,7 +459,6 @@
               $resContent = substr($res, $header_size);
               $resSuccess = curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200;
               $resMessage = reset(explode("\r\n", $header));
-
               if ($resSuccess) {
                 foreach (array_filter(explode("\n", $resContent), 'strlen') AS $line) {
                   $this->out(' - ' . $line);
@@ -491,9 +492,8 @@
 
           // Process Database Updates
             $this->out('Processing Manifest Updates');
-            $model = new JoomlaupdateModelDefault();
             if (!$model->finaliseUpgrade()) {
-              $error_msg = JInstaller::getInstance()->getError();
+              $error_msg = $app->getError();
               $this->out('- Error: Manifest ' . $error_msg);
               $this->outStatus(400, 'Manifest ' . $error_msg);
               return false;
