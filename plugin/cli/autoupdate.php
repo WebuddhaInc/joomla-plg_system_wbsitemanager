@@ -380,6 +380,9 @@
       // File Installations
         if ($package['type'] == 'file') {
 
+          // Preload in case files change
+            require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
+
           // Build Standalone
             $installer_filename = 'installer_' . time() . '.php';
             $installer_filepath = $tmpPath . '/' . $installer_filename;
@@ -488,7 +491,6 @@
 
           // Process Database Updates
             $this->out('Processing Manifest Updates');
-            require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
             $model = new JoomlaupdateModelDefault();
             if (!$model->finaliseUpgrade()) {
               $error_msg = JInstaller::getInstance()->getError();
