@@ -381,8 +381,10 @@
         if ($package['type'] == 'file') {
 
           // Preload in case files change
-            require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
             $app = JInstaller::getInstance();
+            require_once JPATH_BASE . '/administrator/components/com_joomlaupdate/models/default.php';
+            $model = new JoomlaupdateModelDefault();
+            $model->finaliseUpgrade();
             $model = new JoomlaupdateModelDefault();
 
           // Build Standalone
