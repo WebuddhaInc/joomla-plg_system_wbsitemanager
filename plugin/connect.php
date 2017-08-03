@@ -9,22 +9,22 @@
 /**
  * Patch for PHP-FPM missing method
  */
-  
-  if (!function_exists('getallheaders')) { 
-    function getallheaders() { 
-      $headers = array(); 
-      foreach ($_SERVER as $name => $value) { 
-        if (substr($name, 0, 5) == 'HTTP_') { 
-          $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value; 
-        } else if ($name == "CONTENT_TYPE") { 
-          $headers["Content-Type"] = $value; 
-        } else if ($name == "CONTENT_LENGTH") { 
-          $headers["Content-Length"] = $value; 
-        }         
-      } 
-      return $headers; 
-    } 
-  } 
+
+  if (!function_exists('getallheaders')) {
+    function getallheaders() {
+      $headers = array();
+      foreach ($_SERVER as $name => $value) {
+        if (substr($name, 0, 5) == 'HTTP_') {
+          $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+        } else if ($name == "CONTENT_TYPE") {
+          $headers["Content-Type"] = $value;
+        } else if ($name == "CONTENT_LENGTH") {
+          $headers["Content-Length"] = $value;
+        }
+      }
+      return $headers;
+    }
+  }
 
 /**
  * Load Environment
@@ -78,14 +78,29 @@
       die('HTTP/1.0 503 Service Unavailable');
     }
     $plugin_params = json_decode($plugin->params);
+    $authKey = $plugin_params->remote_authkey;
     $ipFilter = array_filter(explode("\n", preg_replace('/[^\n0-9\.\*]/','',$plugin_params->remote_ip_filter)), 'strlen');
     $userFilter = array_filter(explode("\n", preg_replace('/[^\na-z0-9\.\@\_\-]/','',strtolower($plugin_params->remote_user_filter))), 'strlen');
   }
 
 // Filter Required
-  if( empty($ipFilter) && empty($userFilter) ){
+  if( empty($authKey) && empty($ipFilter) && empty($userFilter) ){
     header('HTTP/1.0 403 Forbidden'); // . $_SERVER['REMOTE_ADDR']);
     die('HTTP/1.0 403 Forbidden');
+  }
+
+// Authorization Key Match
+  if( !empty($authKey) ){
+    $headers = getallheaders();
+    if( !empty($headers['Authorization-Manager']) ){
+      $headerAuth = explode(' ', $headers['Authorization-Manager'], 2);
+      $authCredentials = array_combine(array('authkey', 'username', 'password'), explode(':', base64_decode(end($headerAuth)), 3));
+    }
+    $testAuthKey = (string)(!empty($authCredentials) && !empty($authCredentials['authkey']) ? $authCredentials['authkey'] : @$_REQUEST['authKey']);
+    if( empty($testAuthKey) || (string)$authKey !== $testAuthKey ){
+      header('HTTP/1.0 401 Unauthorized Key');
+      die('HTTP/1.0 401 Unauthorized Key');
+    }
   }
 
 // Simple IP Filter
@@ -104,7 +119,7 @@
     $authCredentials = null;
     if( !empty($headers['Authorization-Manager']) ){
       $headerAuth = explode(' ', $headers['Authorization-Manager'], 2);
-      $authCredentials = array_combine(array('username', 'password'), explode(':', base64_decode(end($headerAuth)), 2));
+      $authCredentials = array_combine(array('authkey', 'username', 'password'), explode(':', base64_decode(end($headerAuth)), 3));
     }
     else if( !empty($headers['Authorization']) ){
       $headerAuth = explode(' ', $headers['Authorization'], 2);
@@ -136,6 +151,8 @@
   $_SERVER['argv'] = array('autoupdate.php');
   $mQuery = array_merge($_GET, $_POST);
   foreach( $mQuery AS $k => $v ){
+    if (in_array($k, array('authKey')))
+      continue;
     $_SERVER['argv'][] = '-' . $k;
     if( strlen($v) )
       $_SERVER['argv'][] = urldecode($v);

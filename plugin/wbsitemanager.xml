@@ -31,6 +31,12 @@
     <fields name="params">
       <fieldset name="basic">
         <field
+          type="text"
+          name="remote_authkey"
+          label="plg_system_wbsitemanager_authkey"
+          description="plg_system_wbsitemanager_authkey_desc"
+          />
+        <field
           type="textarea"
           name="remote_ip_filter"
           label="plg_system_wbsitemanager_ip_filter"

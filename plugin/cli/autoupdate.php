@@ -126,10 +126,13 @@
 
       // Validate Tmp Path
         $tmpPath = $this->config->get('tmp_path');
-        if( !is_writeable($tmpPath) ){
+        if( !is_writeable($tmpPath) || (!defined('CLI') && strpos($tmpPath, JPATH_BASE) !== 0) ){
           $tmpPath = JPATH_BASE . '/tmp';
           if( !is_dir($tmpPath) || !is_writeable($tmpPath) ){
             $this->out('Tmp Path not found - ' . $tmpPath);
+            if (!defined('CLI')) {
+              $this->out('Remote execution requires public accessible tmp path - ' . $tmpPath);
+            }
           }
           $this->config->set('tmp_path', JPATH_BASE . '/tmp');
         }
@@ -139,10 +142,11 @@
         $config->set('tmp_path', $this->config->get('tmp_path'));
         $config->set('log_path', $this->config->get('log_path'));
 
-      // Site Root
+      // Remote Access
         if (!defined('CLI')) {
           $config->set('site_base', str_replace('plugins/system/wbsitemanager/', '', JUri::base()));
           $this->config->set('site_base', $config->get('site_base'));
+          $this->config->set('tmp_url', $config->get('site_base') . substr($tmpPath, strlen(JPATH_BASE)+1) . '/');
         }
 
     }
@@ -310,9 +314,6 @@
 
       // Download
         $tmpPath = $this->config->get('tmp_path');
-        if( !is_writeable($tmpPath) ){
-          $tmpPath = JPATH_BASE . '/tmp';
-        }
         $this->out(' - Download ' . $package_url);
         $t_file = JInstallerHelper::getFilenameFromUrl($package_url);
         if (!preg_match('/\.zip$/', $t_file)) {
@@ -419,8 +420,8 @@
           // Call standalone
           // CLI users will get a local run
           // Remote users will get a local callback
-            $this->out('Calling Standalone Installer');
             if (defined('CLI')) {
+              $this->out('Calling Standalone Installer via CLI');
               $exec_output = shell_exec('php ' . $installer_file);
               if ($exec_output) {
                 foreach (array_filter(explode("\n", $exec_output), 'strlen') AS $line) {
@@ -441,7 +442,8 @@
               }
             }
             else {
-              $installer_url = $this->config->get('site_base') . 'tmp/' . $installer_filename;
+              $this->out('Calling Standalone Installer via HTTP');
+              $installer_url = $this->config->get('tmp_url') . $installer_filename;
               $ch = curl_init();
               curl_setopt_array($ch, [
                 CURLOPT_URL => $installer_url,
