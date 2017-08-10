@@ -7,7 +7,7 @@
     <element>wbsitemanager</element>
     <type>plugin</type>
     <folder>system</folder>
-    <version>0.3.3</version>
+    <version>0.6.1</version>
     <client>0</client>
     <infourl title="wbSiteManager Plugin Extension">https://github.com/WebuddhaInc/joomla-plg_system_wbsitemanager</infourl>
     <downloads>
@@ -22,7 +22,7 @@
     <element>wbsitemanager</element>
     <type>plugin</type>
     <folder>system</folder>
-    <version>0.3.3</version>
+    <version>0.6.1</version>
     <client>0</client>
     <infourl title="wbSiteManager Plugin Extension">https://github.com/WebuddhaInc/joomla-plg_system_wbsitemanager</infourl>
     <downloads>
