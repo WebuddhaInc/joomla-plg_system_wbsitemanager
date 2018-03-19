@@ -75,6 +75,14 @@
 // Required Libraries
   jimport('joomla.updater.update');
   jimport('joomla.application.component.helper');
+  jimport('joomla.filesystem.folder');
+  jimport('joomla.filesystem.file');
+
+// Prepare Logger
+  JLog::addLogger(array(
+    'text_file' => 'autoupdate.php',
+    'text_entry_format' => '{DATETIME} {PRIORITY} {MESSAGE}'
+    ), JLog::ALL, array('jerror', 'jinfo', 'Update'));
 
 /**
  * This script will download and install all available updates.
@@ -395,18 +403,23 @@
             if ($fh = fopen($installer_filepath, 'w')) {
               $installer_code = array(
                 '<?php',
-                '/**',
-                ' * wbSiteManager Installer ' . date('Y-m-d H:i:s'),
-                ' */',
-                '',
-                '$time = time();',
-                'include("'. JPATH_BASE .'/plugins/system/wbsitemanager/standaloneInstaller.php");',
-                '$installer = new wbSiteManager_StandaloneInstaller(array(',
-                '  "cache_path"  => "'. $tmpPath .'",',
-                '  "source_path" => "'. $package['extractdir'] .'",',
-                '  "target_path" => "'. JPATH_BASE . '"',
-                '  ));',
-                '$installer->execute();'
+                '/* wbSiteManager Installer ' . date('Y-m-d H:i:s') .' */',
+                'ob_start();',
+                'try {',
+                '  $time = time();',
+                '  include("'. JPATH_BASE .'/plugins/system/wbsitemanager/standaloneInstaller.php");',
+                '  $installer = new wbSiteManager_StandaloneInstaller(array(',
+                '    "cache_path"  => "'. $tmpPath .'",',
+                '    "source_path" => "'. $package['extractdir'] .'",',
+                '    "target_path" => "'. JPATH_BASE . '"',
+                '    ));',
+                '  $installer->execute();',
+                '  include("'. JPATH_BASE .'/plugins/system/wbsitemanager/standaloneInstaller.postFlight.php");',
+                '  echo ob_get_clean();',
+                '} catch (Exception $e) {',
+                '  echo ob_get_clean();',
+                '  echo $e->getMessage();',
+                '}'
                 );
               fwrite( $fh, implode("\n", $installer_code) );
               fclose( $fh );
@@ -422,7 +435,8 @@
           // Remote users will get a local callback
             if (defined('CLI')) {
               $this->out('Calling Standalone Installer via CLI');
-              $exec_output = shell_exec('php ' . $installer_file);
+              // $exec_output = shell_exec('php ' . $installer_file);
+              $exec_output = `php {$installer_filepath}`;
               if ($exec_output) {
                 foreach (array_filter(explode("\n", $exec_output), 'strlen') AS $line) {
                   $this->out(' - ' . $line);
@@ -442,27 +456,45 @@
               }
             }
             else {
+              $headers = getallheaders();
+              $authCredentials = null;
+              if( !empty($headers['Authorization-Manager']) ){
+                $headerAuth = explode(' ', $headers['Authorization-Manager'], 2);
+                $authCredentials = array_combine(array('authkey', 'username', 'password'), explode(':', base64_decode(end($headerAuth)), 3));
+              }
+              else if( !empty($headers['Authorization']) ){
+                $headerAuth = explode(' ', $headers['Authorization'], 2);
+                $authCredentials = array_combine(array('username', 'password'), explode(':', base64_decode(end($headerAuth)), 2));
+              }
+              else if( @$_SERVER['PHP_AUTH_USER'] && @$_SERVER['PHP_AUTH_PW'] ){
+                $authCredentials = array('username' => $_SERVER['PHP_AUTH_USER'], 'password' => $_SERVER['PHP_AUTH_PW']);
+              }
+              $headers = array(
+                'User-Agent: wbSiteManager/0.0.0 curl/'. curl_version() .' PHP/' . phpversion()
+                );
+              if ($authCredentials) {
+                $headers[] = 'Authorization: Basic ' . base64_encode($authCredentials['username'].':'.$authCredentials['password']);
+              }
               $this->out('Calling Standalone Installer via HTTP');
               $installer_url = $this->config->get('tmp_url') . $installer_filename;
+              $this->out('- ' . $installer_url);
               $ch = curl_init();
               curl_setopt_array($ch, [
-                CURLOPT_URL => $installer_url,
+                CURLOPT_URL            => $installer_url,
                 CURLOPT_RETURNTRANSFER => 1,
                 CURLOPT_FOLLOWLOCATION => 1,
-                CURLOPT_TIMEOUT => 90,
-                CURLOPT_VERBOSE => 1,
-                CURLOPT_HEADER => 1,
-                CURLOPT_HTTPHEADER => array(
-                  'User-Agent: wbSiteManager/0.0.0 curl/'. curl_version() .' PHP/' . phpversion()
-                  ),
-                CURLINFO_HEADER_OUT => 1,
+                CURLOPT_TIMEOUT        => 90,
+                CURLOPT_VERBOSE        => 1,
+                CURLOPT_HEADER         => 1,
+                CURLOPT_HTTPHEADER     => $headers,
+                CURLINFO_HEADER_OUT    => 1,
               ]);
               $res         = curl_exec($ch);
               $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
               $header      = substr($res, 0, $header_size);
-              $resContent = substr($res, $header_size);
-              $resSuccess = curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200;
-              $resMessage = reset(explode("\r\n", $header));
+              $resContent  = substr($res, $header_size);
+              $resSuccess  = curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200;
+              $resMessage  = reset(explode("\r\n", $header));
               if ($resSuccess) {
                 foreach (array_filter(explode("\n", $resContent), 'strlen') AS $line) {
                   $this->out(' - ' . $line);
@@ -475,6 +507,8 @@
               }
               else {
                 $this->out('- Error: No Response from Standalone Installer');
+                $this->out('- ' . curl_error($ch));
+                $this->out('- ' . $resMessage);
                 $this->outStatus(400, 'No Response from Standalone Installer');
                 JFile::delete($installer_filepath);
                 return false;
@@ -491,18 +525,23 @@
               JFolder::delete(JPATH_BASE . '/installation');
             }
 
-          // Purge Updates
-            $this->doPurgeUpdatesCache();
-
           // Process Database Updates
-            $this->out('Processing Manifest Updates');
-            if (!$model->finaliseUpgrade()) {
-              $error_msg = $app->getError();
-              $this->out('- Error: Manifest ' . $error_msg);
-              $this->outStatus(400, 'Manifest ' . $error_msg);
-              return false;
+            try {
+              $this->out('Processing Manifest Updates');
+              if (!$model->finaliseUpgrade()) {
+                $error_msg = $installer->getError();
+                $this->out('- Error: Manifest ' . $error_msg);
+                $this->outStatus(400, 'Manifest ' . $error_msg);
+                return false;
+              }
+              $this->out('- Manifest Updates Complete');
+            } catch (Exception $e) {
+              $this->out('- Manifest Update Failed: ' . $e->getMessage());
             }
-            $this->out('- Manifest Updates Complete');
+
+          // Purge Updates
+            $this->out('Purge Update Cache');
+            $this->doPurgeUpdatesCache();
 
           // Fetch Updates
             $this->doFetchUpdates();
@@ -557,7 +596,9 @@
         $update_lookup = array();
 
       // All Items
+        $update_all = false;
         if( $this->input->get('a', $this->input->get('all')) ){
+          $update_all = true;
         }
 
       // Core Items
@@ -601,76 +642,82 @@
         }
 
       // List / Export / Process Updates
-        $update_rows = $this->getUpdateRows( array_shift($update_lookup) );
-        if( $update_rows ){
-          $do_list     = $this->input->get('l', $this->input->get('list'));
-          $do_export   = $this->input->get('x', $this->input->get('export'));
-          $do_update   = $this->input->get('u', $this->input->get('update'));
-          $export_data = null;
-          if( $do_export ){
-            $export_data = array(
-              'updates' => array()
+        $update_rows = null;
+        if( $update_all || count($update_lookup) ){
+          $update_rows = $this->getUpdateRows( array_shift($update_lookup) );
+          if( $update_rows ){
+            $do_list     = $this->input->get('l', $this->input->get('list'));
+            $do_export   = $this->input->get('x', $this->input->get('export'));
+            $do_update   = $this->input->get('u', $this->input->get('update'));
+            $export_data = null;
+            if( $do_export ){
+              $export_data = array(
+                'updates' => array()
+                );
+            }
+            else if( $do_list ){
+              $this->out(implode('',array(
+                str_pad('uid', 10, ' ', STR_PAD_RIGHT),
+                str_pad('eid', 10, ' ', STR_PAD_RIGHT),
+                str_pad('element', 30, ' ', STR_PAD_RIGHT),
+                str_pad('type', 10, ' ', STR_PAD_RIGHT),
+                str_pad('version', 10, ' ', STR_PAD_RIGHT),
+                str_pad('installed', 10, ' ', STR_PAD_RIGHT)
+                )));
+            }
+            $run_update_rows = array();
+            do {
+              foreach( $update_rows AS $update_row ){
+                $extension = $this->db
+                  ->setQuery("
+                    SELECT *
+                    FROM `#__extensions`
+                    WHERE `extension_id` = '". (int)$update_row->extension_id ."'
+                    ")
+                  ->loadObject();
+                $update_row->installed_version = null;
+                if( $extension->manifest_cache && $extension_manifest = json_decode($extension->manifest_cache) ){
+                  $update_row->installed_version = $extension_manifest ? $extension_manifest->version : null;
+                }
+                if( $do_export ){
+                  $export_data['updates'][] = $update_row;
+                }
+                else if( $do_list ){
+                  $this->out(implode('',array(
+                    str_pad($update_row->update_id, 10, ' ', STR_PAD_RIGHT),
+                    str_pad($update_row->extension_id, 10, ' ', STR_PAD_RIGHT),
+                    str_pad($update_row->element, 30, ' ', STR_PAD_RIGHT),
+                    str_pad($update_row->type, 10, ' ', STR_PAD_RIGHT),
+                    str_pad($update_row->version, 10, ' ', STR_PAD_RIGHT),
+                    str_pad($update_row->installed_version, 10, ' ', STR_PAD_RIGHT)
+                    )));
+                }
+              }
+              if( $do_update ){
+                $run_update_rows += $update_rows;
+              }
+            } while(
+              count($update_lookup)
+              && $update_rows = $this->getUpdateRows( array_shift($update_lookup) )
               );
-          }
-          else if( $do_list ){
-            $this->out(implode('',array(
-              str_pad('uid', 10, ' ', STR_PAD_RIGHT),
-              str_pad('eid', 10, ' ', STR_PAD_RIGHT),
-              str_pad('element', 30, ' ', STR_PAD_RIGHT),
-              str_pad('type', 10, ' ', STR_PAD_RIGHT),
-              str_pad('version', 10, ' ', STR_PAD_RIGHT),
-              str_pad('installed', 10, ' ', STR_PAD_RIGHT)
-              )));
-          }
-          $run_update_rows = array();
-          do {
-            foreach( $update_rows AS $update_row ){
-              $extension = $this->db
-                ->setQuery("
-                  SELECT *
-                  FROM `#__extensions`
-                  WHERE `extension_id` = '". (int)$update_row->extension_id ."'
-                  ")
-                ->loadObject();
-              $update_row->installed_version = null;
-              if( $extension->manifest_cache && $extension_manifest = json_decode($extension->manifest_cache) ){
-                $update_row->installed_version = $extension_manifest ? $extension_manifest->version : null;
+            if( count($run_update_rows) ){
+              foreach( $run_update_rows AS $update_row ){
+                if( !$this->doInstallUpdate( $update_row->update_id ) ){
+                  return false;
+                }
               }
-              if( $do_export ){
-                $export_data['updates'][] = $update_row;
-              }
-              else if( $do_list ){
-                $this->out(implode('',array(
-                  str_pad($update_row->update_id, 10, ' ', STR_PAD_RIGHT),
-                  str_pad($update_row->extension_id, 10, ' ', STR_PAD_RIGHT),
-                  str_pad($update_row->element, 30, ' ', STR_PAD_RIGHT),
-                  str_pad($update_row->type, 10, ' ', STR_PAD_RIGHT),
-                  str_pad($update_row->version, 10, ' ', STR_PAD_RIGHT),
-                  str_pad($update_row->installed_version, 10, ' ', STR_PAD_RIGHT)
-                  )));
-              }
+              $this->out('Update processing complete');
             }
-            if( $do_update ){
-              $run_update_rows += $update_rows;
+            if( isset($export_data) ){
+              $this->out( $export_data );
             }
-          } while(
-            count($update_lookup)
-            && $update_rows = $this->getUpdateRows( array_shift($update_lookup) )
-            );
-          if( count($run_update_rows) ){
-            foreach( $run_update_rows AS $update_row ){
-              if( !$this->doInstallUpdate( $update_row->update_id ) ){
-                return false;
-              }
-            }
-            $this->out('Update processing complete');
           }
-          if( isset($export_data) ){
-            $this->out( $export_data );
+          else {
+            $this->out('No updates found');
           }
         }
         else {
-          $this->out('No updates found');
+          $this->out('No update filter provided');
         }
 
     }
@@ -705,6 +752,7 @@
     public function out( $text = '', $nl = true ){
       if( isset($this->__outputBuffer) ){
         if( is_string($text) ){
+          JLog::add($text, JLog::INFO, 'Update');
           $this->__outputBuffer['log'][] = $text;
         }
         else {
@@ -722,6 +770,7 @@
      * @return [type]          [description]
      */
     public function outStatus( $status, $message ){
+      JLog::add($message, JLog::INFO, 'Update');
       $this->__outputBuffer['status']  = $status;
       $this->__outputBuffer['message'] = $message;
     }

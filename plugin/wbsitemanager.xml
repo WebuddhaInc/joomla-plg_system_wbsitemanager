@@ -3,12 +3,12 @@
   <name>plg_system_wbsitemanager</name>
   <description>plg_system_wbsitemanager_desc</description>
   <author>David Hunt (webuddha.com)</author>
-  <creationDate>Dec 2015</creationDate>
-  <copyright>(c)2015 Webuddha.com, The Holodyn Corporation. All rights reserved.</copyright>
+  <creationDate>Oct 2017</creationDate>
+  <copyright>(c)2015-2017 Webuddha.com, The Holodyn Corporation. All rights reserved.</copyright>
   <license>http://www.gnu.org/copyleft/gpl.html GNU/GPL</license>
   <authorEmail>webmaster@webuddha.com</authorEmail>
   <authorUrl>www.webuddha.com</authorUrl>
-  <version>0.6.1</version>
+  <version>0.7.0</version>
   <scriptfile>installer.php</scriptfile>
   <updateservers>
     <server type="extension" priority="1" name="wbSiteManager System Plugin for Joomla! CMS">https://raw.githubusercontent.com/WebuddhaInc/joomla-plg_system_wbsitemanager/master/manifest.xml</server>
@@ -17,10 +17,12 @@
     <filename plugin="wbsitemanager">wbsitemanager.php</filename>
     <filename>connect.php</filename>
     <filename>htaccess.txt</filename>
-    <filename>wbsitemanager.php</filename>
+    <filename>installer.php</filename>
     <filename>standaloneInstaller.php</filename>
+    <filename>standaloneInstaller.postFlight.php</filename>
     <filename>wbsitemanager.xml</filename>
     <folder>classes</folder>
+    <folder>cli</folder>
     <folder>language</folder>
   </files>
   <languages folder="language">

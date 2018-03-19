@@ -43,7 +43,8 @@ class wbSiteManager_StandaloneInstaller {
       $msg = array($msg);
     foreach( $msg AS $m )
       echo date('H:i:s').': '.($error?'Error: ':'').$m."\n";
-    ob_flush();
+    if (headers_sent())
+      ob_flush();
     if( $error )
       exit(1);
     if( $usleep )
